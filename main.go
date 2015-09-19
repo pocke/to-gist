@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -20,8 +19,9 @@ func main() {
 }
 
 func CLIMain(args []string) error {
-	if len(args) == 1 {
-		return fmt.Errorf("file name is required")
+	c, err := FlagParse(args)
+	if err != nil {
+		return err
 	}
 
 	token, err := getToken()
@@ -29,25 +29,21 @@ func CLIMain(args []string) error {
 		return err
 	}
 
-	content, err := ioutil.ReadAll(os.Stdin)
-	if err != nil {
-		return err
-	}
-
-	return CreateGist(args[1], string(content), token)
+	return CreateGist(c, token)
 }
 
-func CreateGist(name, content string, token gha.RoundTripper) error {
-	fname := github.GistFilename(name)
+func CreateGist(cli *CLI, token gha.RoundTripper) error {
+	fname := github.GistFilename(cli.FileName)
 	files := make(map[github.GistFilename]github.GistFile)
-	files[fname] = github.GistFile{Content: &content}
+	files[fname] = github.GistFile{Content: &cli.FileContent}
 
 	c := github.NewClient(&http.Client{
 		Transport: token,
 	})
 
 	gist, _, err := c.Gists.Create(&github.Gist{
-		Files: files,
+		Files:  files,
+		Public: &cli.Public,
 	})
 	if err != nil {
 		return err
